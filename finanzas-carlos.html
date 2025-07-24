@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control de Finanzas - Carlos (Cloud)</title>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; }
+        h1 { text-align: center; color: #333; margin-bottom: 20px; }
+        .seccion { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        input, select, button { padding: 10px; margin: 5px; border: 1px solid #ccc; border-radius: 3px; }
+        button { background: #007cba; color: white; cursor: pointer; border: none; }
+        button:hover { background: #005a87; }
+        .btn-success { background: #27ae60; }
+        .btn-warning { background: #f39c12; }
+        .btn-danger { background: #e74c3c; }
+        .btn-google { background: #4285f4; color: white; }
+        .item { display: flex; justify-content: space-between; padding: 8px; border-bottom: 1px solid #eee; align-items: center; }
+        .eliminar { background: #e74c3c; padding: 5px 10px; }
+        .eliminar:hover { background: #c0392b; }
+        .resumen { background: #ecf0f1; padding: 15px; border-radius: 5px; margin: 20px 0; }
+        .total { font-weight: bold; font-size: 18px; color: #27ae60; }
+        .auth-section { text-align: center; padding: 30px; }
+        .status { padding: 10px; border-radius: 5px; margin: 10px 0; }
+        .status-success { background: #d4edda; color: #155724; }
+        .status-error { background: #f8d7da; color: #721c24; }
+        .tabs { display: flex; margin-bottom: 20px; flex-wrap: wrap; }
+        .tab { padding: 10px 20px; background: #eee; cursor: pointer; border: 1px solid #ddd; margin: 2px; }
+        .tab.activo { background: #007cba; color: white; }
+        .tab-content { display: none; }
+        .tab-content.activo { display: block; }
+        .cloud-status { 
+            position: fixed; 
+            top: 10px; 
+            right: 10px; 
+            padding: 10px; 
+            border-radius: 5px; 
+            color: white; 
+            font-size: 12px;
+            z-index: 1000;
+        }
+        .cloud-connected { background: #27ae60; }
+        .cloud-disconnected { background: #e74c3c; }
+        .cloud-syncing { background: #3498db; }
+        .obligacion-item { background: #f8f9fa; }
+    </style>
+</head>
+<body>
+    <!-- Cloud Status Indicator -->
+    <div id="cloud-status" class="cloud-status cloud-disconnected">
+        ☁️ Desconectado
+    </div>
+
+    <div class="container">
+        <h1>💰 Control de Finanzas - Carlos (Cloud)</h1>
+        
+        <!-- Authentication Section -->
+        <div id="auth-section" class="auth-section">
+            <div id="login-ui">
+                <h3>🔐 Iniciar Sesión con Google</h3>
+                <button onclick="iniciarSesionGoogle()" class="btn-google">
+                    Iniciar con Google
+                </button>
+                <p><small>✅ Tus datos se guardarán automáticamente en la nube</small></p>
+                <p><small>✅ Accede desde cualquier dispositivo</small></p>
+                <p><small>✅ Nunca se perderán tus finanzas</small></p>
+            </div>
+            <div id="user-info" style="display: none;">
+                <p>Bienvenido, <span id="user-name"></span>!</p>
+                <button onclick="cerrarSesion()" class="btn-danger">Cerrar Sesión</button>
+            </div>
+        </div>
+
+        <!-- Main App (shown when authenticated) -->
+        <div id="app-content" style="display: none;">
+            <!-- Tabs -->
+            <div class="tabs">
+                <div class="tab activo" onclick="mostrarTab('principal')">Principal</div>
+                <div class="tab" onclick="mostrarTab('obligaciones')">Obligaciones</div>
+                <div class="tab" onclick="mostrarTab('ahorros')">Ahorros</div>
+                <div class="tab" onclick="mostrarTab('cloud')">☁️ Cloud</div>
+            </div>
+
+            <!-- Tab Principal -->
+            <div id="tab-principal" class="tab-content activo">
+                <div class="resumen">
+                    <h3>📊 Resumen Mensual</h3>
+                    <p>Total Obligaciones: <span id="total-obligaciones" class="total-obligaciones">$2,613,283</span></p>
+                    <p>Total Ingresos: <span id="total-ingresos" class="total">$0.00</span></p>
+                    <p>Total Gastos: <span id="total-gastos" class="total">$0.00</span></p>
+                    <p><strong>Saldo Disponible:</strong> <span id="saldo" class="total">$0.00</span></p>
+                </div>
+
+                <div class="seccion">
+                    <h3>📈 Ingresos</h3>
+                    <input type="text" id="descripcion-ingreso" placeholder="Descripción">
+                    <input type="number" id="monto-ingreso" placeholder="Monto" step="0.01">
+                    <button onclick="agregarIngreso()">Agregar Ingreso</button>
+                    <div id="lista-ingresos"></div>
+                </div>
+
+                <div class="seccion">
+                    <h3>🛒 Gastos</h3>
+                    <input type="text" id="descripcion-gasto" placeholder="Descripción">
+                    <input type="number" id="monto-gasto" placeholder="Monto" step="0.01">
+                    <button onclick="agregarGasto()">Agregar Gasto</button>
+                    <div id="lista-gastos"></div>
+                </div>
+            </div>
+
+            <!-- Tab Obligaciones -->
+            <div id="tab-obligaciones" class="tab-content">
+                <div class="seccion">
+                    <h3>📋 Tus Obligaciones Mensuales</h3>
+                    <div id="lista-obligaciones"></div>
+                </div>
+            </div>
+
+            <!-- Tab Ahorros -->
+            <div id="tab-ahorros" class="tab-content">
+                <div class="seccion">
+                    <h3>💰 Ahorros</h3>
+                    <input type="text" id="descripcion-ahorro" placeholder="Descripción">
+                    <input type="number" id="monto-ahorro" placeholder="Monto" step="0.01">
+                    <button onclick="agregarAhorro()">Agregar Ahorro</button>
+                    <div id="lista-ahorros"></div>
+                </div>
+            </div>
+
+            <!-- Tab Cloud -->
+            <div id="tab-cloud" class="tab-content">
+                <div class="seccion">
+                    <h3>☁️ Estado de la Nube</h3>
+                    <div class="status status-success">
+                        <p>✅ Conectado a Firebase</p>
+                        <p>👤 Usuario: <span id="cloud-user"></span></p>
+                        <p>💾 Datos sincronizados: <span id="sync-status">Sí</span></p>
+                        <p>🕒 Última sincronización: <span id="last-sync">Justo ahora</span></p>
+                    </div>
+                </div>
+
+                <div class="seccion">
+                    <h3>🔄 Sincronización</h3>
+                    <button onclick="forzarSincronizacion()" class="btn-warning">Forzar Sincronización</button>
+                    <button onclick="exportarDatosLocal()" class="btn-success">Exportar Backup Local</button>
+                </div>
+
+                <div class="seccion">
+                    <h3>📊 Información</h3>
+                    <p><strong>Total de Obligaciones:</strong> 17</p>
+                    <p><strong>Total Mensual:</strong> $2,613,283</p>
+                    <p><strong>Datos en la nube:</strong> Seguros y accesibles</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ✅ TUS DATOS DE FIREBASE CONFIGURADOS AQUÍ:
+        const firebaseConfig = {
+            apiKey: "AIzaSyDdDVbgk0_4jy710M20JS2NW3Dzj4GgnlA",
+            authDomain: "finanzas-carlos-1016a.firebaseapp.com",
+            databaseURL: "https://finanzas-carlos-1016a-default-rtdb.firebaseio.com",
+            projectId: "finanzas-carlos-1016a",
+            storageBucket: "finanzas-carlos-1016a.firebasestorage.app",
+            messagingSenderId: "801600970542",
+            appId: "1:801600970542:web:fa8d96c5c237a27051a4bf"
+        };
+
+        // Inicializar Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        const auth = firebase.auth();
+
+        // Tus datos de obligaciones fijas
+        const obligacionesFijas = [
+            { id: 1, nombre: "COLEGIO DE NICO", monto: 577000, diaInicio: 21, diaVencimiento: 5 },
+            { id: 2, nombre: "MERCADO", monto: 800000, diaInicio: 21, diaVencimiento: 5 },
+            { id: 3, nombre: "COMBUSTIBLE CARRO", monto: 400000, diaInicio: 21, diaVencimiento: 5 },
+            { id: 4, nombre: "SEGURIDAD SOCIAL", monto: 107000, diaInicio: 21, diaVencimiento: 5 },
+            { id: 5, nombre: "INTERNET MADRE", monto: 80000, diaInicio: 21, diaVencimiento: 5 },
+            { id: 6, nombre: "CELULAR MADRE", monto: 45000, diaInicio: 21, diaVencimiento: 5 },
+            { id: 7, nombre: "CELULAR MIO", monto: 140000, diaInicio: 21, diaVencimiento: 5 },
+            { id: 8, nombre: "PLATA JUAN DAVID", monto: 200000, diaInicio: 21, diaVencimiento: 5 },
+            { id: 9, nombre: "YOUTUBE", monto: 43000, diaInicio: 21, diaVencimiento: 5 },
+            { id: 10, nombre: "CAPCUT", monto: 29900, diaInicio: 21, diaVencimiento: 5 },
+            { id: 11, nombre: "CHAT GPT", monto: 89000, diaInicio: 21, diaVencimiento: 5 },
+            { id: 12, nombre: "META", monto: 33500, diaInicio: 21, diaVencimiento: 5 },
+            { id: 13, nombre: "SMARTFIT CARLOS", monto: 64900, diaInicio: 21, diaVencimiento: 5 },
+            { id: 14, nombre: "SMARTFIT LUZMA", monto: 64900, diaInicio: 21, diaVencimiento: 5 },
+            { id: 15, nombre: "ALMACENAMIENTO GOOGLE", monto: 8900, diaInicio: 21, diaVencimiento: 5 },
+            { id: 16, nombre: "ADOBE PREMIER", monto: 39283, diaInicio: 21, diaVencimiento: 5 },
+            { id: 17, nombre: "ARRIENDO", monto: 1400000, diaInicio: 21, diaVencimiento: 5 }
+        ];
+
+        // Variables globales
+        let datosUsuario = {
+            ingresos: [],
+            gastos: [],
+            ahorros: []
+        };
+
+        let currentUser = null;
+
+        // Funciones de autenticación
+        function iniciarSesionGoogle() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            auth.signInWithPopup(provider)
+                .then((result) => {
+                    currentUser = result.user;
+                    mostrarApp();
+                    actualizarEstadoCloud('connected');
+                    cargarDatosCloud();
+                })
+                .catch((error) => {
+                    console.error('Error de autenticación:', error);
+                    alert('Error al iniciar sesión: ' + error.message);
+                });
+        }
+
+        function cerrarSesion() {
+            auth.signOut().then(() => {
+                currentUser = null;
+                mostrarLogin();
+                actualizarEstadoCloud('disconnected');
+            });
+        }
+
+        // Funciones de Cloud Storage
+        function cargarDatosCloud() {
+            if (!currentUser) return;
+            
+            const userRef = database.ref('usuarios/' + currentUser.uid);
+            userRef.once('value')
+                .then((snapshot) => {
+                    const datos = snapshot.val();
+                    if (datos) {
+                        datosUsuario = datos;
+                    } else {
+                        // Si no hay datos, crear estructura inicial
+                        datosUsuario = {
+                            ingresos: [],
+                            gastos: [],
+                            ahorros: []
+                        };
+                    }
+                    mostrarTodo();
+                })
+                .catch((error) => {
+                    console.error('Error cargando datos:', error);
+                });
+        }
+
+        function guardarDatosCloud() {
+            if (!currentUser) return;
+            
+            actualizarEstadoCloud('syncing');
+            const userRef = database.ref('usuarios/' + currentUser.uid);
+            userRef.set(datosUsuario)
+                .then(() => {
+                    actualizarEstadoCloud('connected');
+                    document.getElementById('last-sync').textContent = new Date().toLocaleTimeString();
+                })
+                .catch((error) => {
+                    console.error('Error guardando datos:', error);
+                    actualizarEstadoCloud('error');
+                });
+        }
+
+        function actualizarEstadoCloud(estado) {
+            const statusElement = document.getElementById('cloud-status');
+            const statusText = document.getElementById('sync-status');
+            
+            switch(estado) {
+                case 'connected':
+                    statusElement.className = 'cloud-status cloud-connected';
+                    statusElement.innerHTML = '☁️ Conectado';
+                    if (statusText) statusText.textContent = 'Sí';
+                    break;
+                case 'disconnected':
+                    statusElement.className = 'cloud-status cloud-disconnected';
+                    statusElement.innerHTML = '☁️ Desconectado';
+                    if (statusText) statusText.textContent = 'No';
+                    break;
+                case 'syncing':
+                    statusElement.className = 'cloud-status cloud-syncing';
+                    statusElement.innerHTML = '☁️ Sincronizando...';
+                    break;
+                case 'error':
+                    statusElement.className = 'cloud-status cloud-disconnected';
+                    statusElement.innerHTML = '☁️ Error';
+                    break;
+            }
+        }
+
+        // Funciones de UI
+        function mostrarLogin() {
+            document.getElementById('auth-section').style.display = 'block';
+            document.getElementById('app-content').style.display = 'none';
+        }
+
+        function mostrarApp() {
+            document.getElementById('auth-section').style.display = 'none';
+            document.getElementById('app-content').style.display = 'block';
+            document.getElementById('cloud-user').textContent = currentUser.email;
+            document.getElementById('user-name').textContent = currentUser.displayName || currentUser.email;
+        }
+
+        function mostrarTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('activo'));
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('activo'));
+            document.getElementById('tab-' + tabName).classList.add('activo');
+            event.target.classList.add('activo');
+        }
+
+        // Funciones de datos
+        function mostrarTodo() {
+            mostrarIngresos();
+            mostrarGastos();
+            mostrarObligaciones();
+            mostrarAhorros();
+            actualizarResumen();
+        }
+
+        function actualizarResumen() {
+            const totalIngresos = datosUsuario.ingresos.reduce((sum, item) => sum + (item.monto || 0), 0);
+            const totalGastos = datosUsuario.gastos.reduce((sum, item) => sum + (item.monto || 0), 0);
+            
+            document.getElementById('total-ingresos').textContent = '$' + totalIngresos.toLocaleString();
+            document.getElementById('total-gastos').textContent = '$' + totalGastos.toLocaleString();
+            document.getElementById('saldo').textContent = '$' + (totalIngresos - totalGastos).toLocaleString();
+        }
+
+        function agregarIngreso() {
+            const descripcion = document.getElementById('descripcion-ingreso').value;
+            const monto = parseFloat(document.getElementById('monto-ingreso').value);
+            
+            if (descripcion && !isNaN(monto)) {
+                datosUsuario.ingresos.push({
+                    id: Date.now(),
+                    descripcion,
+                    monto,
+                    fecha: new Date().toISOString()
+                });
+                guardarDatosCloud();
+                mostrarTodo();
+                document.getElementById('descripcion-ingreso').value = '';
+                document.getElementById('monto-ingreso').value = '';
+            }
+        }
+
+        function agregarGasto() {
+            const descripcion = document.getElementById('descripcion-gasto').value;
+            const monto = parseFloat(document.getElementById('monto-gasto').value);
+            
+            if (descripcion && !isNaN(monto)) {
+                datosUsuario.gastos.push({
+                    id: Date.now(),
+                    descripcion,
+                    monto,
+                    fecha: new Date().toISOString()
+                });
+                guardarDatosCloud();
+                mostrarTodo();
+                document.getElementById('descripcion-gasto').value = '';
+                document.getElementById('monto-gasto').value = '';
+            }
+        }
+
+        function agregarAhorro() {
+            const descripcion = document.getElementById('descripcion-ahorro').value;
+            const monto = parseFloat(document.getElementById('monto-ahorro').value);
+            
+            if (descripcion && !isNaN(monto)) {
+                datosUsuario.ahorros.push({
+                    id: Date.now(),
+                    descripcion,
+                    monto,
+                    fecha: new Date().toISOString()
+                });
+                guardarDatosCloud();
+                mostrarTodo();
+                document.getElementById('descripcion-ahorro').value = '';
+                document.getElementById('monto-ahorro').value = '';
+            }
+        }
+
+        function mostrarIngresos() {
+            const lista = document.getElementById('lista-ingresos');
+            if (datosUsuario.ingresos.length === 0) {
+                lista.innerHTML = '<div class="item">No hay ingresos registrados</div>';
+                return;
+            }
+            
+            const ingresosOrdenados = [...datosUsuario.ingresos].sort((a, b) => b.id - a.id);
+            lista.innerHTML = ingresosOrdenados.map(item => `
+                <div class="item">
+                    <span>${item.descripcion} - $${item.monto.toLocaleString()}</span>
+                    <button class="eliminar" onclick="eliminarItem('ingresos', ${item.id})">Eliminar</button>
+                </div>
+            `).join('');
+        }
+
+        function mostrarGastos() {
+            const lista = document.getElementById('lista-gastos');
+            if (datosUsuario.gastos.length === 0) {
+                lista.innerHTML = '<div class="item">No hay gastos registrados</div>';
+                return;
+            }
+            
+            const gastosOrdenados = [...datosUsuario.gastos].sort((a, b) => b.id - a.id);
+            lista.innerHTML = gastosOrdenados.map(item => `
+                <div class="item">
+                    <span>${item.descripcion} - $${item.monto.toLocaleString()}</span>
+                    <button class="eliminar" onclick="eliminarItem('gastos', ${item.id})">Eliminar</button>
+                </div>
+            `).join('');
+        }
+
+        function mostrarObligaciones() {
+            const lista = document.getElementById('lista-obligaciones');
+            lista.innerHTML = obligacionesFijas.map(item => `
+                <div class="item obligacion-item">
+                    <div>
+                        <strong>${item.nombre}</strong><br>
+                        <small>$${item.monto.toLocaleString()} - Ciclo: día ${item.diaInicio} a ${item.diaVencimiento}</small>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function mostrarAhorros() {
+            const lista = document.getElementById('lista-ahorros');
+            if (datosUsuario.ahorros.length === 0) {
+                lista.innerHTML = '<div class="item">No hay ahorros registrados</div>';
+                return;
+            }
+            
+            const ahorrosOrdenados = [...datosUsuario.ahorros].sort((a, b) => b.id - a.id);
+            lista.innerHTML = ahorrosOrdenados.map(item => `
+                <div class="item">
+                    <span>${item.descripcion} - $${item.monto.toLocaleString()}</span>
+                    <button class="eliminar" onclick="eliminarItem('ahorros', ${item.id})">Eliminar</button>
+                </div>
+            `).join('');
+        }
+
+        function eliminarItem(tipo, id) {
+            datosUsuario[tipo] = datosUsuario[tipo].filter(item => item.id !== id);
+            guardarDatosCloud();
+            mostrarTodo();
+        }
+
+        function forzarSincronizacion() {
+            guardarDatosCloud();
+            alert('✅ Sincronización forzada completada');
+        }
+
+        function exportarDatosLocal() {
+            const datosExport = {
+                ...datosUsuario,
+                obligacionesFijas,
+                fechaExport: new Date().toISOString(),
+                usuario: currentUser ? currentUser.email : 'sin_usuario'
+            };
+            
+            const datosStr = JSON.stringify(datosExport, null, 2);
+            const blob = new Blob([datosStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'finanzas-carlos-backup-' + new Date().toISOString().split('T')[0] + '.json';
+            a.click();
+        }
+
+        // Inicializar
+        window.onload = function() {
+            mostrarLogin();
+            
+            // Configurar listeners de autenticación
+            auth.onAuthStateChanged((user) => {
+                if (user) {
+                    currentUser = user;
+                    mostrarApp();
+                    actualizarEstadoCloud('connected');
+                    cargarDatosCloud();
+                } else {
+                    mostrarLogin();
+                    actualizarEstadoCloud('disconnected');
+                }
+            });
+        };
+    </script>
+</body>
+</html>
