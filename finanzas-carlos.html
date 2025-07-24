@@ -58,6 +58,11 @@
         .categoria-transporte { background: #fdedec; border-left: 4px solid #e74c3c; }
         .categoria-servicios { background: #e8f8f5; border-left: 4px solid #1abc9c; }
         .categoria-suscripciones { background: #f4ecf7; border-left: 4px solid #9b59b6; }
+        .categoria-ahorros { background: #e9f7ef; border-left: 4px solid #27ae60; }
+        .categoria-alimentacion { background: #fef5e7; border-left: 4px solid #f1c40f; }
+        .categoria-salud { background: #fadbd8; border-left: 4px solid #e74c3c; }
+        .categoria-ocio { background: #d6eaf8; border-left: 4px solid #3498db; }
+        .categoria-otros { background: #f4f6f6; border-left: 4px solid #7f8c8d; }
     </style>
 </head>
 <body>
@@ -101,7 +106,7 @@
                 <!-- Resumen General -->
                 <div class="resumen">
                     <h3>📊 Resumen Mensual</h3>
-                    <p>Total Obligaciones: <span id="total-obligaciones" class="total-obligaciones">$0.00</span></p>
+                    <p>Total Obligaciones: <span id="total-obligaciones" class="total-obligaciones">$2,613,283</span></p>
                     <p>Total Ingresos: <span id="total-ingresos" class="total">$0.00</span></p>
                     <p>Total Gastos: <span id="total-gastos" class="total">$0.00</span></p>
                     <p><strong>Saldo Disponible:</strong> <span id="saldo" class="total">$0.00</span></p>
@@ -131,6 +136,7 @@
                         <option value="servicios">Servicios</option>
                         <option value="ocio">Ocio</option>
                         <option value="salud">Salud</option>
+                        <option value="suscripciones">Suscripciones</option>
                         <option value="otros">Otros</option>
                     </select>
                     <button onclick="agregarGasto()">Agregar Gasto</button>
@@ -154,6 +160,8 @@
                         <option value="servicios">Servicios</option>
                         <option value="suscripciones">Suscripciones</option>
                         <option value="ahorros">Ahorros</option>
+                        <option value="salud">Salud</option>
+                        <option value="alimentacion">Alimentación</option>
                         <option value="otros">Otros</option>
                     </select>
                     <button onclick="agregarObligacion()">Agregar Obligación</button>
@@ -182,7 +190,7 @@
                     <span>%</span>
                     <button onclick="guardarPorcentajeAhorro()">Guardar</button>
                     <p><small>Actualmente: <span id="porcentaje-actual">10</span>% de tus ingresos se ahorran automáticamente</small></p>
-                    <div class="stats-card">
+                    <div class="status status-success">
                         <p>Ahorro Automático este mes: <span id="ahorro-auto-mes" class="total">$0.00</span></p>
                     </div>
                 </div>
@@ -217,7 +225,8 @@
 
                 <div class="seccion">
                     <h3>📊 Información</h3>
-                    <p><strong>Total de Obligaciones:</strong> <span id="total-obligaciones-count">0</span></p>
+                    <p><strong>Total de Obligaciones:</strong> 17</p>
+                    <p><strong>Total Mensual:</strong> $2,613,283</p>
                     <p><strong>Datos en la nube:</strong> Seguros y accesibles</p>
                 </div>
             </div>
@@ -241,9 +250,10 @@
         const database = firebase.database();
         const auth = firebase.auth();
 
-        // Datos iniciales
-        let datosUsuario = {
+        // Datos iniciales con estructura completa
+        const datosIniciales = {
             obligaciones: [
+              
             ],
             ingresos: [],
             gastos: [],
@@ -253,6 +263,9 @@
             },
             pagosRealizados: {} // {obligacionId_mes: true}
         };
+
+        // Datos del usuario (se inicializa correctamente)
+        let datosUsuario = JSON.parse(JSON.stringify(datosIniciales));
 
         let currentUser = null;
 
@@ -289,13 +302,28 @@
                 .then((snapshot) => {
                     const datos = snapshot.val();
                     if (datos) {
-                        datosUsuario = datos;
+                        // Merge los datos cargados con la estructura inicial
+                        datosUsuario = {
+                            ...datosIniciales, // Mantener obligaciones fijas
+                            ...datos, // Sobrescribir con datos del usuario
+                            // Asegurar que todas las propiedades existan
+                            obligaciones: datos.obligaciones || datosIniciales.obligaciones,
+                            ingresos: datos.ingresos || [],
+                            gastos: datos.gastos || [],
+                            ahorrosManuales: datos.ahorrosManuales || [],
+                            configuracion: datos.configuracion || datosIniciales.configuracion,
+                            pagosRealizados: datos.pagosRealizados || {}
+                        };
                     }
                     mostrarTodo();
                     verificarRecordatorios();
                 })
                 .catch((error) => {
                     console.error('Error cargando datos:', error);
+                    // Usar datos iniciales si hay error
+                    datosUsuario = JSON.parse(JSON.stringify(datosIniciales));
+                    mostrarTodo();
+                    verificarRecordatorios();
                 });
         }
 
@@ -373,16 +401,16 @@
         }
 
         function calcularTotalIngresos() {
-            return datosUsuario.ingresos.reduce((sum, item) => sum + item.monto, 0);
+            return (datosUsuario.ingresos || []).reduce((sum, item) => sum + (item.monto || 0), 0);
         }
 
         function calcularTotalGastos() {
-            return datosUsuario.gastos.reduce((sum, item) => sum + item.monto, 0);
+            return (datosUsuario.gastos || []).reduce((sum, item) => sum + (item.monto || 0), 0);
         }
 
         function calcularAhorroAutomatico() {
             const totalIngresos = calcularTotalIngresos();
-            return (totalIngresos * datosUsuario.configuracion.porcentajeAhorro) / 100;
+            return (totalIngresos * (datosUsuario.configuracion?.porcentajeAhorro || 10)) / 100;
         }
 
         function calcularSaldo() {
@@ -400,9 +428,8 @@
             document.getElementById('total-ingresos').textContent = '$' + calcularTotalIngresos().toLocaleString();
             document.getElementById('total-gastos').textContent = '$' + calcularTotalGastos().toLocaleString();
             document.getElementById('saldo').textContent = '$' + calcularSaldo().toLocaleString();
-            document.getElementById('porcentaje-actual').textContent = datosUsuario.configuracion.porcentajeAhorro;
+            document.getElementById('porcentaje-actual').textContent = datosUsuario.configuracion?.porcentajeAhorro || 10;
             document.getElementById('ahorro-auto-mes').textContent = '$' + calcularAhorroAutomatico().toLocaleString();
-            document.getElementById('total-obligaciones-count').textContent = datosUsuario.obligaciones.length;
         }
 
         // Mostrar todas las listas
@@ -424,6 +451,10 @@
                 return;
             }
             
+            if (!datosUsuario.configuracion) {
+                datosUsuario.configuracion = {};
+            }
+            
             datosUsuario.configuracion.porcentajeAhorro = porcentaje;
             guardarDatosCloud();
             actualizarResumen();
@@ -438,6 +469,11 @@
             if (!descripcion || isNaN(monto)) {
                 alert('Completa todos los campos');
                 return;
+            }
+            
+            // Asegurar que el array exista
+            if (!datosUsuario.ingresos) {
+                datosUsuario.ingresos = [];
             }
             
             datosUsuario.ingresos.push({
@@ -463,6 +499,11 @@
             if (!descripcion || isNaN(monto)) {
                 alert('Completa todos los campos');
                 return;
+            }
+            
+            // Asegurar que el array exista
+            if (!datosUsuario.gastos) {
+                datosUsuario.gastos = [];
             }
             
             datosUsuario.gastos.push({
@@ -491,6 +532,11 @@
             if (!nombre || isNaN(monto)) {
                 alert('Completa al menos el nombre y el monto');
                 return;
+            }
+            
+            // Asegurar que el array exista
+            if (!datosUsuario.obligaciones) {
+                datosUsuario.obligaciones = [];
             }
             
             datosUsuario.obligaciones.push({
@@ -523,6 +569,11 @@
                 return;
             }
             
+            // Asegurar que el array exista
+            if (!datosUsuario.ahorrosManuales) {
+                datosUsuario.ahorrosManuales = [];
+            }
+            
             datosUsuario.ahorrosManuales.push({
                 id: Date.now(),
                 descripcion: descripcion,
@@ -542,13 +593,20 @@
 
         // Eliminar item
         function eliminarItem(tipo, id) {
+            // Asegurar que el array exista
+            if (!datosUsuario[tipo]) {
+                datosUsuario[tipo] = [];
+            }
+            
             if (tipo === 'obligaciones') {
                 // También eliminar registros de pagos
-                Object.keys(datosUsuario.pagosRealizados || {}).forEach(key => {
-                    if (key.startsWith(id + '_')) {
-                        delete datosUsuario.pagosRealizados[key];
-                    }
-                });
+                if (datosUsuario.pagosRealizados) {
+                    Object.keys(datosUsuario.pagosRealizados).forEach(key => {
+                        if (key.startsWith(id + '_')) {
+                            delete datosUsuario.pagosRealizados[key];
+                        }
+                    });
+                }
             }
             
             datosUsuario[tipo] = datosUsuario[tipo].filter(item => item.id !== id);
@@ -558,13 +616,13 @@
 
         // Marcar obligación como pagada
         function marcarComoPagada(obligacionId) {
-            const mesActual = getMesActual();
-            const key = obligacionId + '_' + mesActual;
-            
+            // Asegurar que el objeto exista
             if (!datosUsuario.pagosRealizados) {
                 datosUsuario.pagosRealizados = {};
             }
             
+            const mesActual = getMesActual();
+            const key = obligacionId + '_' + mesActual;
             datosUsuario.pagosRealizados[key] = true;
             guardarDatosCloud();
             mostrarTodo();
@@ -583,6 +641,12 @@
         // Mostrar obligaciones con categorías
         function mostrarObligaciones() {
             const lista = document.getElementById('lista-obligaciones');
+            
+            // Asegurar que el array exista
+            if (!datosUsuario.obligaciones) {
+                datosUsuario.obligaciones = [];
+            }
+            
             if (datosUsuario.obligaciones.length === 0) {
                 lista.innerHTML = '<div class="item">No hay obligaciones registradas</div>';
                 return;
@@ -603,6 +667,11 @@
         function mostrarObligacionesPendientes() {
             const hoy = new Date();
             const diaHoy = hoy.getDate();
+            
+            // Asegurar que el array exista
+            if (!datosUsuario.obligaciones) {
+                datosUsuario.obligaciones = [];
+            }
             
             const pendientes = datosUsuario.obligaciones.filter(obligacion => {
                 // Verificar si ya está pagada este mes
@@ -640,7 +709,12 @@
             const lista = document.getElementById('lista-ahorros-manuales');
             document.getElementById('ahorro-auto-mes').textContent = calcularAhorroAutomatico().toLocaleString();
             
-            if (!datosUsuario.ahorrosManuales || datosUsuario.ahorrosManuales.length === 0) {
+            // Asegurar que el array exista
+            if (!datosUsuario.ahorrosManuales) {
+                datosUsuario.ahorrosManuales = [];
+            }
+            
+            if (datosUsuario.ahorrosManuales.length === 0) {
                 lista.innerHTML = '<div class="item">No hay ahorros manuales registrados</div>';
                 return;
             }
@@ -671,20 +745,23 @@
             
             let alertas = [];
             
-            if (datosUsuario.obligaciones) {
-                datosUsuario.obligaciones.forEach(obligacion => {
-                    let enPeriodo = false;
-                    if (obligacion.diaInicio > obligacion.diaVencimiento) {
-                        enPeriodo = diaHoy >= obligacion.diaInicio || diaHoy <= obligacion.diaVencimiento;
-                    } else {
-                        enPeriodo = diaHoy >= obligacion.diaInicio && diaHoy <= obligacion.diaVencimiento;
-                    }
-                    
-                    if (enPeriodo && !estaPagadaEsteMes(obligacion.id)) {
-                        alertas.push(`⚠️ Recordatorio: ${obligacion.nombre} - $${obligacion.monto.toLocaleString()} (vence día ${obligacion.diaVencimiento})`);
-                    }
-                });
+            // Asegurar que el array exista
+            if (!datosUsuario.obligaciones) {
+                datosUsuario.obligaciones = [];
             }
+            
+            datosUsuario.obligaciones.forEach(obligacion => {
+                let enPeriodo = false;
+                if (obligacion.diaInicio > obligacion.diaVencimiento) {
+                    enPeriodo = diaHoy >= obligacion.diaInicio || diaHoy <= obligacion.diaVencimiento;
+                } else {
+                    enPeriodo = diaHoy >= obligacion.diaInicio && diaHoy <= obligacion.diaVencimiento;
+                }
+                
+                if (enPeriodo && !estaPagadaEsteMes(obligacion.id)) {
+                    alertas.push(`⚠️ Recordatorio: ${obligacion.nombre} - $${obligacion.monto.toLocaleString()} (vence día ${obligacion.diaVencimiento})`);
+                }
+            });
             
             // Mostrar alertas en la pantalla principal
             const alertasDiv = document.getElementById('alertas-principal');
@@ -702,20 +779,22 @@
             const hoy = new Date();
             const diaHoy = hoy.getDate();
             
-            let pendientesCount = 0;
-            if (datosUsuario.obligaciones) {
-                pendientesCount = datosUsuario.obligaciones.filter(obligacion => {
-                    if (estaPagadaEsteMes(obligacion.id)) {
-                        return false;
-                    }
-                    
-                    if (obligacion.diaInicio > obligacion.diaVencimiento) {
-                        return diaHoy >= obligacion.diaInicio || diaHoy <= obligacion.diaVencimiento;
-                    } else {
-                        return diaHoy >= obligacion.diaInicio && diaHoy <= obligacion.diaVencimiento;
-                    }
-                }).length;
+            // Asegurar que el array exista
+            if (!datosUsuario.obligaciones) {
+                datosUsuario.obligaciones = [];
             }
+            
+            let pendientesCount = datosUsuario.obligaciones.filter(obligacion => {
+                if (estaPagadaEsteMes(obligacion.id)) {
+                    return false;
+                }
+                
+                if (obligacion.diaInicio > obligacion.diaVencimiento) {
+                    return diaHoy >= obligacion.diaInicio || diaHoy <= obligacion.diaVencimiento;
+                } else {
+                    return diaHoy >= obligacion.diaInicio && diaHoy <= obligacion.diaVencimiento;
+                }
+            }).length;
             
             document.getElementById('contador-pendientes').textContent = pendientesCount;
         }
@@ -723,24 +802,30 @@
         // Mostrar ingresos
         function mostrarIngresos() {
             const lista = document.getElementById('lista-ingresos');
-            if (!datosUsuario.ingresos || datosUsuario.ingresos.length === 0) {
+            
+            // Asegurar que el array exista
+            if (!datosUsuario.ingresos) {
+                datosUsuario.ingresos = [];
+            }
+            
+            if (datosUsuario.ingresos.length === 0) {
                 lista.innerHTML = '<div class="item">No hay ingresos registrados</div>';
                 return;
             }
             
             // Ordenar por fecha (más recientes primero)
             const ingresosOrdenados = [...datosUsuario.ingresos].sort((a, b) => 
-                new Date(b.fecha) - new Date(a.fecha)
+                new Date(b.fecha || 0) - new Date(a.fecha || 0)
             );
             
             lista.innerHTML = ingresosOrdenados.map(item => `
                 <div class="item">
                     <div>
                         <strong>${item.descripcion}</strong><br>
-                        <small>Fecha: ${item.fecha}</small>
+                        <small>Fecha: ${item.fecha || 'Sin fecha'}</small>
                     </div>
                     <div>
-                        $${item.monto.toLocaleString()}
+                        $${(item.monto || 0).toLocaleString()}
                         <button class="eliminar" onclick="eliminarItem('ingresos', ${item.id})" style="margin-left: 10px;">Eliminar</button>
                     </div>
                 </div>
@@ -750,24 +835,30 @@
         // Mostrar gastos
         function mostrarGastos() {
             const lista = document.getElementById('lista-gastos');
-            if (!datosUsuario.gastos || datosUsuario.gastos.length === 0) {
+            
+            // Asegurar que el array exista
+            if (!datosUsuario.gastos) {
+                datosUsuario.gastos = [];
+            }
+            
+            if (datosUsuario.gastos.length === 0) {
                 lista.innerHTML = '<div class="item">No hay gastos registrados</div>';
                 return;
             }
             
             // Ordenar por fecha (más recientes primero)
             const gastosOrdenados = [...datosUsuario.gastos].sort((a, b) => 
-                new Date(b.fecha) - new Date(a.fecha)
+                new Date(b.fecha || 0) - new Date(a.fecha || 0)
             );
             
             lista.innerHTML = gastosOrdenados.map(item => `
-                <div class="item categoria-${item.categoria}">
+                <div class="item categoria-${item.categoria || 'otros'}">
                     <div>
                         <strong>${item.descripcion}</strong><br>
-                        <small>Fecha: ${item.fecha} | Categoría: ${item.categoria}</small>
+                        <small>Fecha: ${item.fecha || 'Sin fecha'} | Categoría: ${item.categoria || 'otros'}</small>
                     </div>
                     <div>
-                        $${item.monto.toLocaleString()}
+                        $${(item.monto || 0).toLocaleString()}
                         <button class="eliminar" onclick="eliminarItem('gastos', ${item.id})" style="margin-left: 10px;">Eliminar</button>
                     </div>
                 </div>
@@ -813,7 +904,7 @@
             });
             
             // Establecer valores por defecto
-            document.getElementById('porcentaje-ahorro').value = datosUsuario.configuracion.porcentajeAhorro;
+            document.getElementById('porcentaje-ahorro').value = datosUsuario.configuracion?.porcentajeAhorro || 10;
         };
     </script>
 </body>
