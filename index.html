@@ -93,8 +93,8 @@
         <div id="auth-section" class="auth-section">
             <div id="login-ui">
                 <h3>🔐 Iniciar Sesión con Google</h3>
-                <button onclick="iniciarSesionGoogle()" class="btn-google" disabled>
-                    Iniciar con Google (Configurar primero)
+                <button onclick="iniciarSesionGoogle()" class="btn-google">
+                    Iniciar con Google
                 </button>
                 <p><small>✅ Tus datos se guardarán automáticamente en la nube</small></p>
                 <p><small>✅ Cada usuario tiene su propio espacio seguro</small></p>
@@ -286,28 +286,29 @@
 
         // Funciones de autenticación
         function iniciarSesionGoogle() {
-            const provider = new firebase.auth.GoogleAuthProvider();
-            auth.signInWithPopup(provider)
-                .then((result) => {
-                    currentUser = result.user;
-                    mostrarApp();
-                    actualizarEstadoCloud('connected');
-                    cargarDatosCloud();
-                })
-                .catch((error) => {
-                    console.error('Error de autenticación:', error);
-                    alert('Error al iniciar sesión: ' + error.message);
-                });
-        }
-
-        function cerrarSesion() {
-            auth.signOut().then(() => {
-                currentUser = null;
-                mostrarLogin();
-                actualizarEstadoCloud('disconnected');
-            });
-        }
-
+    const provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider)
+        .then((result) => {
+            currentUser = result.user;
+            mostrarApp();
+            actualizarEstadoCloud('connected');
+            cargarDatosCloud();
+            console.log('✅ Login exitoso');
+        })
+        .catch((error) => {
+            console.error('❌ Error de autenticación:', error);
+            
+            if (error.code === 'auth/unauthorized-domain') {
+                alert('❌ Error: Este dominio no está autorizado. Contacta al administrador.');
+            } else if (error.code === 'auth/popup-blocked') {
+                alert('❌ Error: Las ventanas emergentes están bloqueadas. Permite las ventanas emergentes y vuelve a intentarlo.');
+            } else if (error.code === 'auth/cancelled-popup-request') {
+                console.log('Usuario cerró la ventana de inicio de sesión');
+            } else {
+                alert('❌ Error al iniciar sesión: ' + error.message);
+            }
+        });
+}
         // Funciones de Cloud Storage
         function cargarDatosCloud() {
             if (!currentUser) return;
