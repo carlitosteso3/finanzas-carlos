@@ -10,7 +10,6 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     
     <style>
-        /* ... (mismo CSS que antes) ... */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
         .container { max-width: 1000px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; }
@@ -62,6 +61,16 @@
             text-align: center;
             border: 1px solid #bee5eb;
         }
+        .categoria-vivienda { background: #fef9e7; border-left: 4px solid #f1c40f; }
+        .categoria-educacion { background: #ebf5fb; border-left: 4px solid #3498db; }
+        .categoria-transporte { background: #fdedec; border-left: 4px solid #e74c3c; }
+        .categoria-servicios { background: #e8f8f5; border-left: 4px solid #1abc9c; }
+        .categoria-suscripciones { background: #f4ecf7; border-left: 4px solid #9b59b6; }
+        .categoria-ahorros { background: #e9f7ef; border-left: 4px solid #27ae60; }
+        .categoria-alimentacion { background: #fef5e7; border-left: 4px solid #f1c40f; }
+        .categoria-salud { background: #fadbd8; border-left: 4px solid #e74c3c; }
+        .categoria-ocio { background: #d6eaf8; border-left: 4px solid #3498db; }
+        .categoria-otros { background: #f4f6f6; border-left: 4px solid #7f8c8d; }
     </style>
 </head>
 <body>
@@ -88,6 +97,8 @@
                     Iniciar con Google (Configurar primero)
                 </button>
                 <p><small>✅ Tus datos se guardarán automáticamente en la nube</small></p>
+                <p><small>✅ Cada usuario tiene su propio espacio seguro</small></p>
+                <p><small>✅ Nunca se perderán tus finanzas</small></p>
             </div>
             <div id="user-info" style="display: none;">
                 <p>Bienvenido, <span id="user-name"></span>!</p>
@@ -95,11 +106,155 @@
             </div>
         </div>
 
-        <!-- Resto del HTML igual... -->
+        <!-- Main App (shown when authenticated) -->
+        <div id="app-content" style="display: none;">
+            <!-- Tabs -->
+            <div class="tabs">
+                <div class="tab activo" onclick="mostrarTab('principal')">Principal</div>
+                <div class="tab" onclick="mostrarTab('obligaciones')">Obligaciones <span id="contador-pendientes" class="badge">0</span></div>
+                <div class="tab" onclick="mostrarTab('ahorros')">Ahorros</div>
+                <div class="tab" onclick="mostrarTab('cloud')">☁️ Cloud</div>
+            </div>
 
-        <script>
-            // ✅ CONFIGURACIÓN DE FIREBASE (Espacio para credenciales)
-            const firebaseConfig = {
+            <!-- Tab Principal -->
+            <div id="tab-principal" class="tab-content activo">
+                <!-- Resumen General -->
+                <div class="resumen">
+                    <h3>📊 Resumen Mensual</h3>
+                    <p>Total Obligaciones: <span id="total-obligaciones" class="total-obligaciones">$0.00</span></p>
+                    <p>Total Ingresos: <span id="total-ingresos" class="total">$0.00</span></p>
+                    <p>Total Gastos: <span id="total-gastos" class="total">$0.00</span></p>
+                    <p><strong>Saldo Disponible:</strong> <span id="saldo" class="total">$0.00</span></p>
+                </div>
+
+                <!-- Alertas -->
+                <div id="alertas-principal"></div>
+
+                <!-- Ingresos -->
+                <div class="seccion">
+                    <h3>📈 Ingresos</h3>
+                    <input type="text" id="descripcion-ingreso" placeholder="Descripción (ej: Salario, Freelance)">
+                    <input type="number" id="monto-ingreso" placeholder="Monto" step="0.01">
+                    <button onclick="agregarIngreso()">Agregar Ingreso</button>
+                    <div id="lista-ingresos"></div>
+                </div>
+
+                <!-- Gastos -->
+                <div class="seccion">
+                    <h3>🛒 Gastos</h3>
+                    <input type="text" id="descripcion-gasto" placeholder="Descripción (ej: Comida, Transporte)">
+                    <input type="number" id="monto-gasto" placeholder="Monto" step="0.01">
+                    <select id="categoria-gasto">
+                        <option value="alimentacion">Alimentación</option>
+                        <option value="transporte">Transporte</option>
+                        <option value="vivienda">Vivienda</option>
+                        <option value="servicios">Servicios</option>
+                        <option value="ocio">Ocio</option>
+                        <option value="salud">Salud</option>
+                        <option value="suscripciones">Suscripciones</option>
+                        <option value="ahorros">Ahorros</option>
+                        <option value="otros">Otros</option>
+                    </select>
+                    <button onclick="agregarGasto()">Agregar Gasto</button>
+                    <div id="lista-gastos"></div>
+                </div>
+            </div>
+
+            <!-- Tab Obligaciones -->
+            <div id="tab-obligaciones" class="tab-content">
+                <!-- Agregar Obligación -->
+                <div class="seccion">
+                    <h3>🏠 Agregar Nueva Obligación</h3>
+                    <input type="text" id="nombre-obligacion" placeholder="Nombre de la obligación (ej: Arriendo, Internet)">
+                    <input type="number" id="monto-obligacion" placeholder="Monto mensual" step="0.01">
+                    <input type="number" id="dia-inicio" placeholder="Día inicio ciclo (ej: 1)" min="1" max="28" value="1">
+                    <input type="number" id="dia-vencimiento" placeholder="Día vencimiento (ej: 15)" min="1" max="31" value="15">
+                    <select id="categoria-obligacion">
+                        <option value="vivienda">Vivienda</option>
+                        <option value="educacion">Educación</option>
+                        <option value="transporte">Transporte</option>
+                        <option value="servicios">Servicios</option>
+                        <option value="suscripciones">Suscripciones</option>
+                        <option value="ahorros">Ahorros</option>
+                        <option value="salud">Salud</option>
+                        <option value="alimentacion">Alimentación</option>
+                        <option value="ocio">Ocio</option>
+                        <option value="otros">Otros</option>
+                    </select>
+                    <button onclick="agregarObligacion()">Agregar Obligación</button>
+                </div>
+
+                <!-- Lista de Obligaciones -->
+                <div class="seccion">
+                    <h3>📋 Tus Obligaciones Mensuales</h3>
+                    <div id="lista-obligaciones"></div>
+                </div>
+
+                <!-- Obligaciones Pendientes -->
+                <div class="seccion">
+                    <h3>⚠️ Obligaciones Pendientes este Mes</h3>
+                    <div id="obligaciones-pendientes"></div>
+                </div>
+            </div>
+
+            <!-- Tab Ahorros -->
+            <div id="tab-ahorros" class="tab-content">
+                <!-- Configuración de Ahorro Automático -->
+                <div class="seccion">
+                    <h3>⚙️ Ahorro Automático</h3>
+                    <p>Porcentaje de ingresos que se destina a ahorro automático:</p>
+                    <input type="number" id="porcentaje-ahorro" placeholder="10" min="0" max="100" value="10" style="width: 80px;">
+                    <span>%</span>
+                    <button onclick="guardarPorcentajeAhorro()">Guardar</button>
+                    <p><small>Actualmente: <span id="porcentaje-actual">10</span>% de tus ingresos se ahorran automáticamente</small></p>
+                    <div class="status status-success">
+                        <p>Ahorro Automático este mes: <span id="ahorro-auto-mes" class="total">$0.00</span></p>
+                    </div>
+                </div>
+
+                <!-- Ahorros Manuales -->
+                <div class="seccion">
+                    <h3>💰 Ahorros Manuales</h3>
+                    <input type="text" id="descripcion-ahorro" placeholder="Descripción (ej: Ahorro para viaje, Emergencia)">
+                    <input type="number" id="monto-ahorro" placeholder="Monto" step="0.01">
+                    <button onclick="agregarAhorroManual()">Agregar Ahorro</button>
+                    <div id="lista-ahorros-manuales"></div>
+                </div>
+            </div>
+
+            <!-- Tab Cloud -->
+            <div id="tab-cloud" class="tab-content">
+                <div class="seccion">
+                    <h3>☁️ Estado de la Nube</h3>
+                    <div class="status status-success">
+                        <p>✅ Conectado a Firebase</p>
+                        <p>👤 Usuario: <span id="cloud-user"></span></p>
+                        <p>💾 Datos sincronizados: <span id="sync-status">Sí</span></p>
+                        <p>🕒 Última sincronización: <span id="last-sync">Justo ahora</span></p>
+                    </div>
+                </div>
+
+                <div class="seccion">
+                    <h3>🔒 Seguridad y Privacidad</h3>
+                    <div class="status status-success">
+                        <p>✅ Tus datos están completamente aislados</p>
+                        <p>✅ Solo tú puedes ver y modificar tu información</p>
+                        <p>✅ Cada usuario tiene su propio espacio seguro</p>
+                    </div>
+                </div>
+
+                <div class="seccion">
+                    <h3>📊 Información</h3>
+                    <p><strong>Total de Obligaciones:</strong> <span id="total-obligaciones-count">0</span></p>
+                    <p><strong>Datos en la nube:</strong> Seguros y accesibles</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ✅ CONFIGURACIÓN DE FIREBASE (TUS CREDENCIALES REALES)
+        const firebaseConfig = {
             apiKey: "AIzaSyDdDVbgk0_4jy710M20JS2NW3Dzj4GgnlA",
             authDomain: "finanzas-carlos-1016a.firebaseapp.com",
             databaseURL: "https://finanzas-carlos-1016a-default-rtdb.firebaseio.com",
@@ -109,74 +264,611 @@
             appId: "1:801600970542:web:fa8d96c5c237a27051a4bf"
         };
 
-            // Verificar si hay credenciales válidas
-            let firebaseIniciado = false;
-            try {
-                if (firebaseConfig.apiKey && firebaseConfig.apiKey.length > 10) {
-                    firebase.initializeApp(firebaseConfig);
-                    const database = firebase.database();
-                    const auth = firebase.auth();
-                    firebaseIniciado = true;
-                    
-                    // Habilitar botón de login
-                    document.querySelector('.btn-google').disabled = false;
-                    document.querySelector('.btn-google').textContent = 'Iniciar con Google';
-                }
-            } catch (error) {
-                console.log('Firebase no configurado');
+        // Inicializar Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        const auth = firebase.auth();
+
+        // Datos iniciales
+        const datosIniciales = {
+            obligaciones: [],
+            ingresos: [],
+            gastos: [],
+            ahorrosManuales: [],
+            configuracion: {
+                porcentajeAhorro: 10
+            },
+            pagosRealizados: {}
+        };
+
+        let datosUsuario = JSON.parse(JSON.stringify(datosIniciales));
+        let currentUser = null;
+
+        // Funciones de autenticación
+        function iniciarSesionGoogle() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            auth.signInWithPopup(provider)
+                .then((result) => {
+                    currentUser = result.user;
+                    mostrarApp();
+                    actualizarEstadoCloud('connected');
+                    cargarDatosCloud();
+                })
+                .catch((error) => {
+                    console.error('Error de autenticación:', error);
+                    alert('Error al iniciar sesión: ' + error.message);
+                });
+        }
+
+        function cerrarSesion() {
+            auth.signOut().then(() => {
+                currentUser = null;
+                mostrarLogin();
+                actualizarEstadoCloud('disconnected');
+            });
+        }
+
+        // Funciones de Cloud Storage
+        function cargarDatosCloud() {
+            if (!currentUser) return;
+            
+            const userRef = database.ref('usuarios/' + currentUser.uid);
+            userRef.once('value')
+                .then((snapshot) => {
+                    const datos = snapshot.val();
+                    if (datos) {
+                        datosUsuario = {
+                            obligaciones: datos.obligaciones || [],
+                            ingresos: datos.ingresos || [],
+                            gastos: datos.gastos || [],
+                            ahorrosManuales: datos.ahorrosManuales || [],
+                            configuracion: datos.configuracion || { porcentajeAhorro: 10 },
+                            pagosRealizados: datos.pagosRealizados || {}
+                        };
+                    } else {
+                        datosUsuario = JSON.parse(JSON.stringify(datosIniciales));
+                    }
+                    mostrarTodo();
+                    verificarRecordatorios();
+                })
+                .catch((error) => {
+                    console.error('Error cargando datos:', error);
+                    datosUsuario = JSON.parse(JSON.stringify(datosIniciales));
+                    mostrarTodo();
+                    verificarRecordatorios();
+                });
+        }
+
+        function guardarDatosCloud() {
+            if (!currentUser) return;
+            
+            actualizarEstadoCloud('syncing');
+            const userRef = database.ref('usuarios/' + currentUser.uid);
+            userRef.set(datosUsuario)
+                .then(() => {
+                    actualizarEstadoCloud('connected');
+                    document.getElementById('last-sync').textContent = new Date().toLocaleTimeString();
+                })
+                .catch((error) => {
+                    console.error('Error guardando datos:', error);
+                    actualizarEstadoCloud('error');
+                });
+        }
+
+        function actualizarEstadoCloud(estado) {
+            const statusElement = document.getElementById('cloud-status');
+            const statusText = document.getElementById('sync-status');
+            
+            switch(estado) {
+                case 'connected':
+                    statusElement.className = 'cloud-status cloud-connected';
+                    statusElement.innerHTML = '☁️ Conectado';
+                    if (statusText) statusText.textContent = 'Sí';
+                    break;
+                case 'disconnected':
+                    statusElement.className = 'cloud-status cloud-disconnected';
+                    statusElement.innerHTML = '☁️ Desconectado';
+                    if (statusText) statusText.textContent = 'No';
+                    break;
+                case 'syncing':
+                    statusElement.className = 'cloud-status cloud-syncing';
+                    statusElement.innerHTML = '☁️ Sincronizando...';
+                    break;
+                case 'error':
+                    statusElement.className = 'cloud-status cloud-disconnected';
+                    statusElement.innerHTML = '☁️ Error';
+                    break;
             }
+        }
 
-            // Resto del código JavaScript...
-            // (El mismo código que tenías, pero con verificaciones de seguridad)
+        // Funciones de UI
+        function mostrarLogin() {
+            document.getElementById('auth-section').style.display = 'block';
+            document.getElementById('app-content').style.display = 'none';
+        }
 
-            // Datos iniciales
-            const datosIniciales = {
-                obligaciones: [],
-                ingresos: [],
-                gastos: [],
-                ahorrosManuales: [],
-                configuracion: {
-                    porcentajeAhorro: 10
-                },
-                pagosRealizados: {}
-            };
+        function mostrarApp() {
+            document.getElementById('auth-section').style.display = 'none';
+            document.getElementById('app-content').style.display = 'block';
+            document.getElementById('cloud-user').textContent = currentUser.email;
+            document.getElementById('user-name').textContent = currentUser.displayName || currentUser.email;
+        }
 
-            let datosUsuario = JSON.parse(JSON.stringify(datosIniciales));
-            let currentUser = null;
+        function mostrarTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('activo'));
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('activo'));
+            document.getElementById('tab-' + tabName).classList.add('activo');
+            event.target.classList.add('activo');
+        }
 
-            // Funciones principales (con verificaciones de seguridad)
-            function iniciarSesionGoogle() {
-                if (!firebaseIniciado) {
-                    alert('❌ Esta aplicación necesita configuración. Contacta al administrador.');
-                    return;
+        // Obtener mes-año actual
+        function getMesActual() {
+            const hoy = new Date();
+            return hoy.getFullYear() + '-' + String(hoy.getMonth() + 1).padStart(2, '0');
+        }
+
+        // Funciones de cálculo
+        function calcularTotalObligaciones() {
+            return (datosUsuario.obligaciones || []).reduce((sum, item) => sum + (item.monto || 0), 0);
+        }
+
+        function calcularTotalIngresos() {
+            return (datosUsuario.ingresos || []).reduce((sum, item) => sum + (item.monto || 0), 0);
+        }
+
+        function calcularTotalGastos() {
+            return (datosUsuario.gastos || []).reduce((sum, item) => sum + (item.monto || 0), 0);
+        }
+
+        function calcularAhorroAutomatico() {
+            const totalIngresos = calcularTotalIngresos();
+            return (totalIngresos * (datosUsuario.configuracion?.porcentajeAhorro || 10)) / 100;
+        }
+
+        function calcularSaldo() {
+            const totalObligaciones = calcularTotalObligaciones();
+            const totalIngresos = calcularTotalIngresos();
+            const totalGastos = calcularTotalGastos();
+            const ahorroAutomatico = calcularAhorroAutomatico();
+            
+            return totalIngresos - totalGastos - totalObligaciones - ahorroAutomatico;
+        }
+
+        // Actualizar resumen
+        function actualizarResumen() {
+            document.getElementById('total-obligaciones').textContent = '$' + calcularTotalObligaciones().toLocaleString();
+            document.getElementById('total-ingresos').textContent = '$' + calcularTotalIngresos().toLocaleString();
+            document.getElementById('total-gastos').textContent = '$' + calcularTotalGastos().toLocaleString();
+            document.getElementById('saldo').textContent = '$' + calcularSaldo().toLocaleString();
+            document.getElementById('porcentaje-actual').textContent = datosUsuario.configuracion?.porcentajeAhorro || 10;
+            document.getElementById('ahorro-auto-mes').textContent = '$' + calcularAhorroAutomatico().toLocaleString();
+            document.getElementById('total-obligaciones-count').textContent = (datosUsuario.obligaciones || []).length;
+        }
+
+        // Mostrar todas las listas
+        function mostrarTodo() {
+            mostrarIngresos();
+            mostrarGastos();
+            mostrarObligaciones();
+            mostrarObligacionesPendientes();
+            mostrarAhorros();
+            actualizarResumen();
+            actualizarContadorPendientes();
+        }
+
+        // Guardar porcentaje de ahorro
+        function guardarPorcentajeAhorro() {
+            const porcentaje = parseInt(document.getElementById('porcentaje-ahorro').value);
+            if (isNaN(porcentaje) || porcentaje < 0 || porcentaje > 100) {
+                alert('Ingresa un porcentaje válido (0-100)');
+                return;
+            }
+            
+            if (!datosUsuario.configuracion) {
+                datosUsuario.configuracion = {};
+            }
+            
+            datosUsuario.configuracion.porcentajeAhorro = porcentaje;
+            guardarDatosCloud();
+            actualizarResumen();
+            alert('Porcentaje de ahorro guardado: ' + porcentaje + '%');
+        }
+
+        // Agregar funciones para ingresos, gastos, obligaciones, etc.
+        function agregarIngreso() {
+            const descripcion = document.getElementById('descripcion-ingreso').value;
+            const monto = parseFloat(document.getElementById('monto-ingreso').value);
+            
+            if (!descripcion || isNaN(monto)) {
+                alert('Completa todos los campos');
+                return;
+            }
+            
+            if (!datosUsuario.ingresos) {
+                datosUsuario.ingresos = [];
+            }
+            
+            datosUsuario.ingresos.push({
+                id: Date.now(),
+                descripcion: descripcion,
+                monto: monto,
+                fecha: new Date().toISOString().split('T')[0]
+            });
+            
+            guardarDatosCloud();
+            mostrarTodo();
+            
+            document.getElementById('descripcion-ingreso').value = '';
+            document.getElementById('monto-ingreso').value = '';
+        }
+
+        function agregarGasto() {
+            const descripcion = document.getElementById('descripcion-gasto').value;
+            const monto = parseFloat(document.getElementById('monto-gasto').value);
+            const categoria = document.getElementById('categoria-gasto').value;
+            
+            if (!descripcion || isNaN(monto)) {
+                alert('Completa todos los campos');
+                return;
+            }
+            
+            if (!datosUsuario.gastos) {
+                datosUsuario.gastos = [];
+            }
+            
+            datosUsuario.gastos.push({
+                id: Date.now(),
+                descripcion: descripcion,
+                monto: monto,
+                categoria: categoria,
+                fecha: new Date().toISOString().split('T')[0]
+            });
+            
+            guardarDatosCloud();
+            mostrarTodo();
+            
+            document.getElementById('descripcion-gasto').value = '';
+            document.getElementById('monto-gasto').value = '';
+        }
+
+        function agregarObligacion() {
+            const nombre = document.getElementById('nombre-obligacion').value;
+            const monto = parseFloat(document.getElementById('monto-obligacion').value);
+            const diaInicio = parseInt(document.getElementById('dia-inicio').value) || 1;
+            const diaVencimiento = parseInt(document.getElementById('dia-vencimiento').value) || 15;
+            const categoria = document.getElementById('categoria-obligacion').value;
+            
+            if (!nombre || isNaN(monto)) {
+                alert('Completa al menos el nombre y el monto');
+                return;
+            }
+            
+            if (!datosUsuario.obligaciones) {
+                datosUsuario.obligaciones = [];
+            }
+            
+            datosUsuario.obligaciones.push({
+                id: Date.now(),
+                nombre: nombre,
+                monto: monto,
+                diaInicio: diaInicio,
+                diaVencimiento: diaVencimiento,
+                categoria: categoria
+            });
+            
+            guardarDatosCloud();
+            mostrarTodo();
+            
+            document.getElementById('nombre-obligacion').value = '';
+            document.getElementById('monto-obligacion').value = '';
+            document.getElementById('dia-inicio').value = '1';
+            document.getElementById('dia-vencimiento').value = '15';
+            
+            alert('Obligación agregada correctamente');
+        }
+
+        function agregarAhorroManual() {
+            const descripcion = document.getElementById('descripcion-ahorro').value;
+            const monto = parseFloat(document.getElementById('monto-ahorro').value);
+            
+            if (!descripcion || isNaN(monto)) {
+                alert('Completa todos los campos');
+                return;
+            }
+            
+            if (!datosUsuario.ahorrosManuales) {
+                datosUsuario.ahorrosManuales = [];
+            }
+            
+            datosUsuario.ahorrosManuales.push({
+                id: Date.now(),
+                descripcion: descripcion,
+                monto: monto,
+                fecha: new Date().toISOString().split('T')[0]
+            });
+            
+            guardarDatosCloud();
+            mostrarTodo();
+            
+            document.getElementById('descripcion-ahorro').value = '';
+            document.getElementById('monto-ahorro').value = '';
+            
+            alert('Ahorro registrado correctamente');
+        }
+
+        // Eliminar item
+        function eliminarItem(tipo, id) {
+            if (!datosUsuario[tipo]) {
+                datosUsuario[tipo] = [];
+            }
+            
+            if (tipo === 'obligaciones') {
+                if (datosUsuario.pagosRealizados) {
+                    Object.keys(datosUsuario.pagosRealizados).forEach(key => {
+                        if (key.startsWith(id + '_')) {
+                            delete datosUsuario.pagosRealizados[key];
+                        }
+                    });
+                }
+            }
+            
+            datosUsuario[tipo] = datosUsuario[tipo].filter(item => item.id !== id);
+            guardarDatosCloud();
+            mostrarTodo();
+        }
+
+        // Marcar obligación como pagada
+        function marcarComoPagada(obligacionId) {
+            if (!datosUsuario.pagosRealizados) {
+                datosUsuario.pagosRealizados = {};
+            }
+            
+            const mesActual = getMesActual();
+            const key = obligacionId + '_' + mesActual;
+            datosUsuario.pagosRealizados[key] = true;
+            guardarDatosCloud();
+            mostrarTodo();
+            alert('Obligación marcada como pagada');
+        }
+
+        // Verificar si una obligación está pagada este mes
+        function estaPagadaEsteMes(obligacionId) {
+            if (!datosUsuario.pagosRealizados) return false;
+            
+            const mesActual = getMesActual();
+            const key = obligacionId + '_' + mesActual;
+            return datosUsuario.pagosRealizados[key] === true;
+        }
+
+        // Mostrar obligaciones
+        function mostrarObligaciones() {
+            const lista = document.getElementById('lista-obligaciones');
+            
+            if (!datosUsuario.obligaciones) {
+                datosUsuario.obligaciones = [];
+            }
+            
+            if (datosUsuario.obligaciones.length === 0) {
+                lista.innerHTML = '<div class="item">No hay obligaciones registradas. Agrega tu primera obligación!</div>';
+                return;
+            }
+            
+            lista.innerHTML = datosUsuario.obligaciones.map(item => `
+                <div class="item categoria-${item.categoria}">
+                    <div>
+                        <strong>${item.nombre}</strong><br>
+                        <small>$${(item.monto || 0).toLocaleString()} - Ciclo: día ${item.diaInicio} a ${item.diaVencimiento} | ${item.categoria}</small>
+                    </div>
+                    <button class="eliminar" onclick="eliminarItem('obligaciones', ${item.id})">Eliminar</button>
+                </div>
+            `).join('');
+        }
+
+        // Mostrar obligaciones pendientes
+        function mostrarObligacionesPendientes() {
+            const hoy = new Date();
+            const diaHoy = hoy.getDate();
+            
+            if (!datosUsuario.obligaciones) {
+                datosUsuario.obligaciones = [];
+            }
+            
+            const pendientes = datosUsuario.obligaciones.filter(obligacion => {
+                if (estaPagadaEsteMes(obligacion.id)) {
+                    return false;
                 }
                 
-                const provider = new firebase.auth.GoogleAuthProvider();
-                auth.signInWithPopup(provider)
-                    .then((result) => {
-                        currentUser = result.user;
-                        mostrarApp();
-                        actualizarEstadoCloud('connected');
-                        cargarDatosCloud();
-                    })
-                    .catch((error) => {
-                        console.error('Error:', error);
-                        alert('Error: ' + error.message);
-                    });
-            }
-
-            function cerrarSesion() {
-                if (firebaseIniciado && auth) {
-                    auth.signOut().then(() => {
-                        currentUser = null;
-                        mostrarLogin();
-                        actualizarEstadoCloud('disconnected');
-                    });
+                if (obligacion.diaInicio > obligacion.diaVencimiento) {
+                    return diaHoy >= obligacion.diaInicio || diaHoy <= obligacion.diaVencimiento;
+                } else {
+                    return diaHoy >= obligacion.diaInicio && diaHoy <= obligacion.diaVencimiento;
                 }
+            });
+            
+            const lista = document.getElementById('obligaciones-pendientes');
+            if (pendientes.length === 0) {
+                lista.innerHTML = '<div class="item">No hay obligaciones pendientes este mes</div>';
+                return;
             }
+            
+            lista.innerHTML = pendientes.map(item => `
+                <div class="item alerta-pendiente categoria-${item.categoria}">
+                    <div>
+                        <strong>⚠️ ${item.nombre}</strong><br>
+                        <small>Monto: $${(item.monto || 0).toLocaleString()} | Vence: día ${item.diaVencimiento}</small>
+                    </div>
+                    <button onclick="marcarComoPagada(${item.id})">Marcar como Pagada</button>
+                </div>
+            `).join('');
+        }
 
-            // Resto de funciones igual...
-        </script>
-    </div>
+        // Mostrar ahorros manuales
+        function mostrarAhorros() {
+            const lista = document.getElementById('lista-ahorros-manuales');
+            document.getElementById('ahorro-auto-mes').textContent = calcularAhorroAutomatico().toLocaleString();
+            
+            if (!datosUsuario.ahorrosManuales) {
+                datosUsuario.ahorrosManuales = [];
+            }
+            
+            if (datosUsuario.ahorrosManuales.length === 0) {
+                lista.innerHTML = '<div class="item">No hay ahorros manuales registrados</div>';
+                return;
+            }
+            
+            const ahorrosOrdenados = [...datosUsuario.ahorrosManuales].sort((a, b) => 
+                new Date(b.fecha) - new Date(a.fecha)
+            );
+            
+            lista.innerHTML = ahorrosOrdenados.map(item => `
+                <div class="item">
+                    <div>
+                        <strong>${item.descripcion}</strong><br>
+                        <small>Fecha: ${item.fecha}</small>
+                    </div>
+                    <div>
+                        $${(item.monto || 0).toLocaleString()}
+                        <button class="eliminar" onclick="eliminarItem('ahorrosManuales', ${item.id})" style="margin-left: 10px;">Eliminar</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Verificar y mostrar recordatorios
+        function verificarRecordatorios() {
+            const hoy = new Date();
+            const diaHoy = hoy.getDate();
+            
+            let alertas = [];
+            
+            if (datosUsuario.obligaciones) {
+                datosUsuario.obligaciones.forEach(obligacion => {
+                    let enPeriodo = false;
+                    if (obligacion.diaInicio > obligacion.diaVencimiento) {
+                        enPeriodo = diaHoy >= obligacion.diaInicio || diaHoy <= obligacion.diaVencimiento;
+                    } else {
+                        enPeriodo = diaHoy >= obligacion.diaInicio && diaHoy <= obligacion.diaVencimiento;
+                    }
+                    
+                    if (enPeriodo && !estaPagadaEsteMes(obligacion.id)) {
+                        alertas.push(`⚠️ Recordatorio: ${obligacion.nombre} - $${(obligacion.monto || 0).toLocaleString()} (vence día ${obligacion.diaVencimiento})`);
+                    }
+                });
+            }
+            
+            const alertasDiv = document.getElementById('alertas-principal');
+            if (alertas.length > 0) {
+                alertasDiv.innerHTML = alertas.map(alerta => 
+                    `<div class="alerta recordatorio">${alerta}</div>`
+                ).join('');
+            } else {
+                alertasDiv.innerHTML = '';
+            }
+        }
+
+        // Actualizar contador de pendientes
+        function actualizarContadorPendientes() {
+            const hoy = new Date();
+            const diaHoy = hoy.getDate();
+            
+            let pendientesCount = 0;
+            if (datosUsuario.obligaciones) {
+                pendientesCount = datosUsuario.obligaciones.filter(obligacion => {
+                    if (estaPagadaEsteMes(obligacion.id)) {
+                        return false;
+                    }
+                    
+                    if (obligacion.diaInicio > obligacion.diaVencimiento) {
+                        return diaHoy >= obligacion.diaInicio || diaHoy <= obligacion.diaVencimiento;
+                    } else {
+                        return diaHoy >= obligacion.diaInicio && diaHoy <= obligacion.diaVencimiento;
+                    }
+                }).length;
+            }
+            
+            document.getElementById('contador-pendientes').textContent = pendientesCount;
+        }
+
+        // Mostrar ingresos
+        function mostrarIngresos() {
+            const lista = document.getElementById('lista-ingresos');
+            
+            if (!datosUsuario.ingresos) {
+                datosUsuario.ingresos = [];
+            }
+            
+            if (datosUsuario.ingresos.length === 0) {
+                lista.innerHTML = '<div class="item">No hay ingresos registrados. Agrega tu primer ingreso!</div>';
+                return;
+            }
+            
+            const ingresosOrdenados = [...datosUsuario.ingresos].sort((a, b) => 
+                new Date(b.fecha || 0) - new Date(a.fecha || 0)
+            );
+            
+            lista.innerHTML = ingresosOrdenados.map(item => `
+                <div class="item">
+                    <div>
+                        <strong>${item.descripcion}</strong><br>
+                        <small>Fecha: ${item.fecha || 'Sin fecha'}</small>
+                    </div>
+                    <div>
+                        $${(item.monto || 0).toLocaleString()}
+                        <button class="eliminar" onclick="eliminarItem('ingresos', ${item.id})" style="margin-left: 10px;">Eliminar</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Mostrar gastos
+        function mostrarGastos() {
+            const lista = document.getElementById('lista-gastos');
+            
+            if (!datosUsuario.gastos) {
+                datosUsuario.gastos = [];
+            }
+            
+            if (datosUsuario.gastos.length === 0) {
+                lista.innerHTML = '<div class="item">No hay gastos registrados. Agrega tu primer gasto!</div>';
+                return;
+            }
+            
+            const gastosOrdenados = [...datosUsuario.gastos].sort((a, b) => 
+                new Date(b.fecha || 0) - new Date(a.fecha || 0)
+            );
+            
+            lista.innerHTML = gastosOrdenados.map(item => `
+                <div class="item categoria-${item.categoria || 'otros'}">
+                    <div>
+                        <strong>${item.descripcion}</strong><br>
+                        <small>Fecha: ${item.fecha || 'Sin fecha'} | Categoría: ${item.categoria || 'otros'}</small>
+                    </div>
+                    <div>
+                        $${(item.monto || 0).toLocaleString()}
+                        <button class="eliminar" onclick="eliminarItem('gastos', ${item.id})" style="margin-left: 10px;">Eliminar</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Inicializar
+        window.onload = function() {
+            mostrarLogin();
+            
+            auth.onAuthStateChanged((user) => {
+                if (user) {
+                    currentUser = user;
+                    mostrarApp();
+                    actualizarEstadoCloud('connected');
+                    cargarDatosCloud();
+                } else {
+                    mostrarLogin();
+                    actualizarEstadoCloud('disconnected');
+                }
+            });
+            
+            document.getElementById('porcentaje-ahorro').value = datosUsuario.configuracion?.porcentajeAhorro || 10;
+        };
+    </script>
 </body>
 </html>
